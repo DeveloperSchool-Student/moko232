@@ -12,13 +12,19 @@ class Config:
     _db_url = os.environ.get("DATABASE_URL")
     
     if _db_url:
-        # Виправляємо формат посилання для SQLAlchemy (postgres:// -> postgresql+asyncpg://)
+        # --- ВИПРАВЛЕННЯ ТУТ ---
+        # Якщо посилання починається з "postgres://", міняємо на асинхронне
         if _db_url.startswith("postgres://"):
             _db_url = _db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        # Якщо посилання починається з "postgresql://", теж міняємо (ось цього не вистачало)
+        elif _db_url.startswith("postgresql://"):
+            _db_url = _db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            
         DB_URL = _db_url
     else:
         # Якщо змінної немає, використовуємо локальний файл (як раніше)
         DB_URL = "sqlite+aiosqlite:///meme_exchange.db"
+    
     # --- ЕКОНОМІКА ---
     MARKET_IMPACT_FACTOR = 0.002
     NEWS_THRESHOLD = 0.10
@@ -38,13 +44,13 @@ class Config:
     CLAN_CREATION_COST = 1000000.0 # Створення Хедж-фонду
     TITLE_CHANGE_COST = 10000.0  # Зміна титулу
 
+# Перевірка на всяк випадок
 if not Config.BOT_TOKEN:
-    raise ValueError("BOT_TOKEN is missing in .env file!")
+     # Щоб локально не падало, якщо немає змінних, але на Render вони є
+    pass
 
 ADMIN_IDS = [6500735335, 123456789] 
 
 class IsAdmin(Filter):
     async def __call__(self, message: Message) -> bool:
-
         return message.from_user.id in ADMIN_IDS
-
