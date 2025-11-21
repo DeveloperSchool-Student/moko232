@@ -12,7 +12,6 @@ import os
 from config import Config
 from database import init_db, async_session
 from handlers import router
-from mechanics import update_prices
 from models import Meme
 
 logging.basicConfig(level=logging.INFO)
@@ -167,4 +166,5 @@ if __name__ == "__main__":
     except (KeyboardInterrupt, SystemExit):
 
         logging.info("Bot stopped!")
+
 
