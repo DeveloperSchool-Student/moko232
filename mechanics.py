@@ -92,12 +92,12 @@ async def update_prices():
                     change_percent=total_change
                 )
                 session.add(news_item)
-
-        # Очищення старих новин (залишаємо тільки останні 20, щоб не забивати базу)
-        # Це проста оптимізація
-        subq = select(News.id).order_by(News.timestamp.desc()).limit(20)
-        # (Складні запити delete в sqlite іноді краще замінити простою логікою, 
-        # але поки що просто додамо нові, очищення можна зробити окремою командою, якщо база виросте)
+                # Заміни блок очищення на це:
+               # Залишаємо останні 20 новин, решту видаляємо
+               all_news = (await session.execute(select(News.id).order_by(News.timestamp.desc()))).scalars().all()
+               if len(all_news) > 20:
+                 ids_to_delete = all_news[20:]
+                 await session.execute(delete(News).where(News.id.in_(ids_to_delete)))
 
         await session.commit()
 
@@ -227,4 +227,5 @@ async def run_lottery(bot: Bot):
         
         # Очищаємо таблицю квитків
         await session.execute(delete(LotteryTicket))
+
         await session.commit()
