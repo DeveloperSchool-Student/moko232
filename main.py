@@ -7,6 +7,7 @@ from sqlalchemy import select
 from mechanics import update_prices, check_bets, run_lottery
 from models import Item
 from aiohttp import web
+import os
 
 from config import Config
 from database import init_db, async_session
@@ -164,4 +165,5 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
+
         logging.info("Bot stopped!")
