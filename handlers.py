@@ -1170,7 +1170,7 @@ async def cb_lottery_menu(callback: types.CallbackQuery):
         )
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🎟 Купити квиток", callback_data="buy_ticket")],
-            [InlineKeyboardButton(text="🔙 Назад", callback_data="buy_service_start")] # Повернення в services (треба буде хендлер зробити або просто ігнорувати start)
+            [InlineKeyboardButton(text="🔙 Назад", callback_data="delete_msg")] # Повернення в services (треба буде хендлер зробити або просто ігнорувати start)
         ])
         # Виправлення: оновимо на повідомлення
         await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
@@ -1392,4 +1392,5 @@ async def cmd_add_stock(message: types.Message):
         
     except Exception as e:
         await message.answer(f"❌ Помилка. Приклад:\n`/addstock PEP 15.5 0.05 https://url...`\nДеталі: {e}")
+
 
