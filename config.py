@@ -12,18 +12,17 @@ class Config:
     _db_url = os.environ.get("DATABASE_URL")
     
     if _db_url:
-        # 1. Виправляємо протокол (postgres -> postgresql+asyncpg)
+        # 1. Завжди беремо тільки "чисту" частину посилання до знаку "?"
+        # Це видаляє ?sslmode=require, &channel_binding=require і все інше сміття
+        if "?" in _db_url:
+            _db_url = _db_url.split("?")[0]
+        
+        # 2. Виправляємо протокол (postgres -> postgresql+asyncpg)
         if _db_url.startswith("postgres://"):
             _db_url = _db_url.replace("postgres://", "postgresql+asyncpg://", 1)
         elif _db_url.startswith("postgresql://"):
             _db_url = _db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
             
-        # 2. ВИПРАВЛЕННЯ ТВОЄЇ ПОМИЛКИ (Видаляємо sslmode)
-        # asyncpg не любить цей параметр у посиланні
-        if "sslmode=require" in _db_url:
-           _db_url = _db_url.replace("?sslmode=require", "")
-           _db_url = _db_url.replace("&sslmode=require", "")
-
         DB_URL = _db_url
     else:
         # Локальна база, якщо змінної немає
