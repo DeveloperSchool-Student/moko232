@@ -6,4 +6,5 @@ python-dotenv
 mplfinance
 pandas
 matplotlib
+asyncpg
 aiohttp
