@@ -1062,8 +1062,12 @@ async def cb_execute_sell(callback: types.CallbackQuery):
         meme = await session.get(Meme, meme_id)
         pf_item = (await session.execute(select(Portfolio).where(Portfolio.user_id==user.id, Portfolio.meme_id==meme.id))).scalar_one_or_none()
 
-        if not pf_item or pf_item.quantity < quantity:
-            return await callback.answer(f"❌ Ти не маєш {quantity} шт {meme.ticker}.", show_alert=True)
+       # --- СТАЛО (Кращий варіант) ---
+    if not pf_item:
+     return await callback.answer("❌ Акцій вже немає.", show_alert=True)
+
+# Якщо хоче продати 10, а є 9 - продаємо 9
+     amount_to_sell = min(quantity, pf_item.quantity)
 
         # --- ЛОГІКА КОМІСІЇ ---
         current_commission_rate = Config.SELL_COMMISSION_BROKER if user.has_license else Config.SELL_COMMISSION_DEFAULT
@@ -1400,6 +1404,7 @@ async def cmd_add_stock(message: types.Message):
         
     except Exception as e:
         await message.answer(f"❌ Помилка. Приклад:\n`/addstock PEP 15.5 0.05 https://url...`\nДеталі: {e}")
+
 
 
 
