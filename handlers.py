@@ -234,15 +234,26 @@ async def cb_market_ignore(callback: types.CallbackQuery):
 @router.callback_query(F.data.startswith("view_"))
 async def cb_view_meme(callback: types.CallbackQuery):
     meme_id = int(callback.data.split("_")[1])
-    user_id = callback.from_user.id
+    telegram_id = callback.from_user.id # Це ID з телеграму
     
     async with async_session() as session:
         meme = await session.get(Meme, meme_id)
         if not meme: return await callback.answer("Акція зникла", show_alert=True)
         
+        # --- ВИПРАВЛЕННЯ ПОЧАТОК ---
+        # 1. Спочатку отримуємо самого юзера з БД
+        user = await get_user(session, telegram_id)
+        
+        # Якщо юзера немає (наприклад, після /reset_world), просимо старт
+        if not user:
+            return await callback.answer("⚠️ Спочатку натисни /start", show_alert=True)
+
+        # 2. Тепер використовуємо user.id (внутрішній ID, наприклад 1), а не telegram_id (6500735335)
         pf_item = (await session.execute(
-            select(Portfolio).where(Portfolio.user_id==user_id, Portfolio.meme_id==meme.id)
+            select(Portfolio).where(Portfolio.user_id==user.id, Portfolio.meme_id==meme.id)
         )).scalar_one_or_none()
+        # --- ВИПРАВЛЕННЯ КІНЕЦЬ ---
+
         user_quantity = pf_item.quantity if pf_item else 0
 
         text = (
@@ -254,21 +265,18 @@ async def cb_view_meme(callback: types.CallbackQuery):
         
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="🟢 Купити", callback_data=f"prompt_buy_{meme.id}_{user_id}"),
-                InlineKeyboardButton(text="🔴 Продати", callback_data=f"prompt_sell_{meme.id}_{user_id}")
+                InlineKeyboardButton(text="🟢 Купити", callback_data=f"prompt_buy_{meme.id}_{telegram_id}"),
+                InlineKeyboardButton(text="🔴 Продати", callback_data=f"prompt_sell_{meme.id}_{telegram_id}")
             ],
             [InlineKeyboardButton(text="📉 Графік", callback_data=f"chart_{meme.id}_{meme.ticker}")],
-            [InlineKeyboardButton(text="🔙 Назад", callback_data=f"market_page_0_{user_id}")]
+            [InlineKeyboardButton(text="🔙 Назад", callback_data=f"market_page_0_{telegram_id}")]
         ])
         
-        # --- ЛОГІКА ЗАМІНИ ПОВІДОМЛЕННЯ ---
-        # Видаляємо старе повідомлення (щоб не було дублікатів або помилок редагування)
         try:
             await callback.message.delete()
         except:
             pass
 
-        # Якщо є картинка - шлемо фото, якщо ні - текст
         if meme.image_url:
             await callback.message.answer_photo(photo=meme.image_url, caption=text, reply_markup=kb, parse_mode="HTML")
         else:
@@ -1392,5 +1400,6 @@ async def cmd_add_stock(message: types.Message):
         
     except Exception as e:
         await message.answer(f"❌ Помилка. Приклад:\n`/addstock PEP 15.5 0.05 https://url...`\nДеталі: {e}")
+
 
 
