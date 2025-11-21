@@ -1,0 +1,9 @@
+aiogram
+sqlalchemy
+aiosqlite
+apscheduler
+python-dotenv
+mplfinance
+pandas
+matplotlib
+aiohttp
