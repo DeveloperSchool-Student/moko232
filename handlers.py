@@ -71,7 +71,7 @@ async def cmd_start(message: types.Message):
             
             start_text = (
                 "🚀 <b>Ласкаво просимо на Meme Stock Exchange!</b>\n\n"
-                "Твій старт: <b>$1000</b>.\n"
+                "Твій старт: <b>$500</b>.\n"
             )
 
             # --- ЛОГІКА НАГОРОДИ ЗА ЗАПРОШЕННЯ ---
@@ -1440,4 +1440,5 @@ async def cmd_profile(message: types.Message):
             else:
                 await message.answer(text, parse_mode="HTML")
         except Exception:
+
             await message.answer(text, parse_mode="HTML")
