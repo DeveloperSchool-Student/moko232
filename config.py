@@ -7,22 +7,26 @@ load_dotenv()
 
 class Config:
     BOT_TOKEN = os.environ.get("BOT_TOKEN")
+    
     # --- ЛОГІКА БАЗИ ДАНИХ ---
-    # Отримуємо посилання від Render (або Neon)
     _db_url = os.environ.get("DATABASE_URL")
     
     if _db_url:
-        # --- ВИПРАВЛЕННЯ ТУТ ---
-        # Якщо посилання починається з "postgres://", міняємо на асинхронне
+        # 1. Виправляємо протокол (postgres -> postgresql+asyncpg)
         if _db_url.startswith("postgres://"):
             _db_url = _db_url.replace("postgres://", "postgresql+asyncpg://", 1)
-        # Якщо посилання починається з "postgresql://", теж міняємо (ось цього не вистачало)
         elif _db_url.startswith("postgresql://"):
             _db_url = _db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
             
+        # 2. ВИПРАВЛЕННЯ ТВОЄЇ ПОМИЛКИ (Видаляємо sslmode)
+        # asyncpg не любить цей параметр у посиланні
+        if "sslmode=require" in _db_url:
+           _db_url = _db_url.replace("?sslmode=require", "")
+           _db_url = _db_url.replace("&sslmode=require", "")
+
         DB_URL = _db_url
     else:
-        # Якщо змінної немає, використовуємо локальний файл (як раніше)
+        # Локальна база, якщо змінної немає
         DB_URL = "sqlite+aiosqlite:///meme_exchange.db"
     
     # --- ЕКОНОМІКА ---
@@ -30,25 +34,24 @@ class Config:
     NEWS_THRESHOLD = 0.10
     
     # Комісії
-    SELL_COMMISSION_DEFAULT = 0.03 # 3%
-    SELL_COMMISSION_BROKER = 0.01  # 1% (для власників ліцензії)
+    SELL_COMMISSION_DEFAULT = 0.03 
+    SELL_COMMISSION_BROKER = 0.01 
     
     # Ставки
     BET_PROFIT_FACTOR = 1.8
     BET_DURATION = 65
 
-    # --- ЦІНИ НА ПОСЛУГИ ---
-    LICENSE_COST = 50000.0       # Ліцензія брокера
-    VIP_COST = 5000.0            # Інсайд (VIP) на 1 годину
-    LOTTERY_TICKET = 500.0       # Квиток лотереї
-    CLAN_CREATION_COST = 1000000.0 # Створення Хедж-фонду
-    TITLE_CHANGE_COST = 10000.0  # Зміна титулу
+    # Ціни
+    LICENSE_COST = 50000.0       
+    VIP_COST = 5000.0            
+    LOTTERY_TICKET = 500.0       
+    CLAN_CREATION_COST = 1000000.0 
+    TITLE_CHANGE_COST = 10000.0  
 
-# Перевірка на всяк випадок
 if not Config.BOT_TOKEN:
-     # Щоб локально не падало, якщо немає змінних, але на Render вони є
     pass
 
+# !!! ПЕРЕВІР, ЩОБ ТУТ БУВ ТВІЙ ID !!!
 ADMIN_IDS = [6500735335, 123456789] 
 
 class IsAdmin(Filter):
