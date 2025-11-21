@@ -136,39 +136,6 @@ async def cmd_help(message: types.Message):
     )
     await message.answer(text, parse_mode="HTML")
 
-@router.message(Command("profile"))
-async def cmd_profile(message: types.Message):
-    async with async_session() as session:
-        user = await get_user(session, message.from_user.id)
-        if not user: return await message.answer("⚠️ Натисни /start")
-
-        net_worth = await get_net_worth(session, user)
-        rank = calculate_rank(net_worth)
-
-        text = (
-            f"👤 <b>Твій Профіль</b>\n"
-            f"────────────────\n"
-            f"🏆 Ранг: <b>{rank}</b>\n"
-            f"💵 Готівка: ${user.balance:.2f}\n"
-            f"📈 Всього активів: <b>${net_worth:.2f}</b>\n"
-            f"────────────────"
-        )
-
-        # --- ОТРИМАННЯ ФОТО ПРОФІЛЮ ---
-        try:
-            # Отримуємо список фото профілю користувача
-            user_photos = await message.bot.get_user_profile_photos(message.from_user.id)
-            
-            if user_photos.total_count > 0:
-                # Беремо найперше фото (photos[0]) і найбільший розмір ([-1])
-                photo_id = user_photos.photos[0][-1].file_id
-                await message.answer_photo(photo=photo_id, caption=text, parse_mode="HTML")
-            else:
-                # Якщо фото немає або приховано — відправляємо просто текст
-                await message.answer(text, parse_mode="HTML")
-        except Exception:
-            # Якщо виникла помилка API — також відправляємо просто текст
-            await message.answer(text, parse_mode="HTML")
 
 # --- РИНОК ---
 
@@ -456,55 +423,6 @@ async def cb_execute_buy(callback: types.CallbackQuery):
         await cb_view_meme(new_callback)
 
 
-@router.callback_query(F.data.startswith("sell_EXECUTE_"))
-async def cb_execute_sell(callback: types.CallbackQuery):
-    _, _, meme_id_str, quantity_str, original_user_id_str = callback.data.split("_")
-    meme_id = int(meme_id_str)
-    quantity = int(quantity_str)
-    original_user_id = int(original_user_id_str)
-    
-    if callback.from_user.id != original_user_id:
-        return await callback.answer("🚫 Ця дія не для тебе. Тисни /market", show_alert=True)
-    
-    async with async_session() as session:
-        user = await get_user(session, original_user_id)
-        meme = await session.get(Meme, meme_id)
-        
-        pf_item = (await session.execute(select(Portfolio).where(Portfolio.user_id==user.id, Portfolio.meme_id==meme.id))).scalar_one_or_none()
-        
-        if not pf_item or pf_item.quantity < quantity:
-            return await callback.answer(
-                f"❌ Ти не маєш {quantity} шт {meme.ticker}.", 
-                show_alert=True
-            )
-
-        # --- РОЗРАХУНОК КОМІСІЇ ---
-        gross_total = meme.current_price * quantity            # Брудна сума
-        commission = gross_total * Config.SELL_COMMISSION      # Розмір комісії
-        net_income = gross_total - commission                  # Чиста сума на руки
-        
-        # Нараховуємо чисту суму
-        user.balance += net_income
-        pf_item.quantity -= quantity
-        
-        if pf_item.quantity == 0: await session.delete(pf_item)
-        
-        # --- ДОДАЄМО ВПЛИВ НА РИНОК ---
-        meme.trade_volume -= quantity  # Продаж штовхає ціну вниз (-)
-            
-        await session.commit()
-        
-        # Повідомляємо про комісію у відповіді
-        await callback.answer(
-            f"💵 Продано {quantity} {meme.ticker}\n"
-            f"Отримано: ${net_income:.2f}\n"
-            f"(Комісія біржі: ${commission:.2f})",
-            show_alert=True
-        )
-        
-        # Повертаємо до меню
-        new_callback = callback.model_copy(update={"data": f"view_{meme.id}"})
-        await cb_view_meme(new_callback)
 
 @router.callback_query(F.data.startswith("chart_"))
 async def cb_chart(callback: types.CallbackQuery):
@@ -1474,3 +1392,4 @@ async def cmd_add_stock(message: types.Message):
         
     except Exception as e:
         await message.answer(f"❌ Помилка. Приклад:\n`/addstock PEP 15.5 0.05 https://url...`\nДеталі: {e}")
+
