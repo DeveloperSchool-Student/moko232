@@ -369,8 +369,11 @@ async def cb_prompt_sell(callback: types.CallbackQuery):
             ]
         ])
         
-        # --- ТУТ ЗМІНИ ---
-        com_percent = Config.SELL_COMMISSION * 100
+        # --- ВИПРАВЛЕННЯ ---
+        # Перевіряємо, яка комісія у гравця (чи є ліцензія)
+        current_com = Config.SELL_COMMISSION_BROKER if user.has_license else Config.SELL_COMMISSION_DEFAULT
+        com_percent = current_com * 100
+
         text = (
             f"💸 <b>Продати {meme.ticker}</b>\n"
             f"Ціна ринку: ${meme.current_price:.4f}\n"
@@ -1404,6 +1407,7 @@ async def cmd_add_stock(message: types.Message):
         
     except Exception as e:
         await message.answer(f"❌ Помилка. Приклад:\n`/addstock PEP 15.5 0.05 https://url...`\nДеталі: {e}")
+
 
 
 
