@@ -3,16 +3,15 @@ import asyncio
 import io
 import pandas as pd
 import mplfinance as mpf
-from sqlalchemy import select, delete # <-- Додай delete
-from database import async_session
-from models import User, Meme, PriceHistory, News, Bet 
-from aiogram import Bot
-from config import Config
 import matplotlib
 from datetime import datetime
-from models import User, Meme, PriceHistory, News, Bet, LotteryTicket
-from sqlalchemy import func
 
+from sqlalchemy import select, delete, func
+from aiogram import Bot
+
+from database import async_session
+from config import Config
+from models import User, Meme, PriceHistory, News, Bet, LotteryTicket
 
 matplotlib.use('Agg')
 
@@ -71,8 +70,8 @@ async def update_prices():
             history = PriceHistory(meme_id=meme.id, price=new_price)
             session.add(history)
 
-            # --- 5. ГЕНЕРАЦІЯ НОВИН (НОВЕ) ---
-            # Генеруємо новину, якщо ціна змінилась більше ніж на 3% (0.03)
+            # --- 5. ГЕНЕРАЦІЯ НОВИН ---
+            # Генеруємо новину, якщо ціна змінилась більше ніж на поріг
             if abs(total_change) >= Config.NEWS_THRESHOLD:
                 
                 if total_change > 0:
@@ -92,12 +91,20 @@ async def update_prices():
                     change_percent=total_change
                 )
                 session.add(news_item)
-                # Заміни блок очищення на це:
-               # Залишаємо останні 20 новин, решту видаляємо
-               all_news = (await session.execute(select(News.id).order_by(News.timestamp.desc()))).scalars().all()
-               if len(all_news) > 20:
-                 ids_to_delete = all_news[20:]
-                 await session.execute(delete(News).where(News.id.in_(ids_to_delete)))
+
+        # --- ОЧИЩЕННЯ СТАРИХ НОВИН ---
+        # Виконуємо це поза циклом, щоб не робити зайвих запитів
+        try:
+            # Отримуємо ID всіх новин, відсортованих від нових до старих
+            all_news_result = await session.execute(select(News.id).order_by(News.timestamp.desc()))
+            all_news_ids = all_news_result.scalars().all()
+            
+            # Якщо новин більше 20, видаляємо зайві
+            if len(all_news_ids) > 20:
+                ids_to_delete = all_news_ids[20:]
+                await session.execute(delete(News).where(News.id.in_(ids_to_delete)))
+        except Exception as e:
+            print(f"Помилка при очищенні новин: {e}")
 
         await session.commit()
 
@@ -107,13 +114,14 @@ def _generate_chart_sync(data, ticker):
     df['Date'] = pd.to_datetime(df['Date'])
     df.set_index('Date', inplace=True)
     
-    # Fake OHLC
+    # Fake OHLC (для лінійного графіку mpf це підходить)
     df['Open'] = df['Price']
     df['High'] = df['Price']
     df['Low'] = df['Price']
     df['Close'] = df['Price']
     
     buf = io.BytesIO()
+    # style='yahoo' або 'binance' виглядають непогано
     mpf.plot(df, type='line', style='yahoo', title=f'{ticker}', savefig=dict(fname=buf, format='png'))
     buf.seek(0)
     return buf
@@ -123,6 +131,7 @@ async def get_meme_chart(meme_id: int, ticker: str):
         query = select(PriceHistory).where(PriceHistory.meme_id == meme_id).order_by(PriceHistory.timestamp.desc()).limit(50)
         result = await session.execute(query)
         history = result.scalars().all()
+        # Реверсуємо, щоб графік йшов зліва направо (від старого до нового)
         data = [{"Date": h.timestamp, "Price": h.price} for h in reversed(history)]
         if not data: return None
         
@@ -156,9 +165,7 @@ async def check_bets(bot: Bot):
             elif bet.direction == "DOWN" and meme.current_price < bet.start_price:
                 won = True
             
-            # Якщо ціна не змінилась - це програш (казино завжди виграє), або повернення (на твій розсуд)
-            # Залишимо як програш для азарту.
-
+            # Формування тексту
             text = ""
             if won:
                 payout = bet.amount * Config.BET_PROFIT_FACTOR
@@ -221,11 +228,7 @@ async def run_lottery(bot: Bot):
                 , parse_mode="HTML")
             except:
                 pass
-            
-            # Сповіщення в загальний канал (через broadcast всім або просто лог)
-            # Тут можна додати запис в новини або новини біржі про лотерею
         
         # Очищаємо таблицю квитків
         await session.execute(delete(LotteryTicket))
-
         await session.commit()
