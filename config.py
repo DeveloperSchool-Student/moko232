@@ -6,6 +6,7 @@ from aiogram.types import Message
 load_dotenv()
 
 class Config:
+    BOT_TOKEN = os.environ.get("BOT_TOKEN")
     DB_URL = "sqlite+aiosqlite:///meme_exchange.db"
     
     # --- ЕКОНОМІКА ---
@@ -34,4 +35,5 @@ ADMIN_IDS = [6500735335, 123456789]
 
 class IsAdmin(Filter):
     async def __call__(self, message: Message) -> bool:
+
         return message.from_user.id in ADMIN_IDS
