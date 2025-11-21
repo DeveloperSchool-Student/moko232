@@ -1051,49 +1051,62 @@ async def cmd_invite(message: types.Message):
 # ------------------------------------------
 @router.callback_query(F.data.startswith("sell_EXECUTE_"))
 async def cb_execute_sell(callback: types.CallbackQuery):
-    # ... (код розбору callback.data залишається таким самим) ...
+    # Розбираємо дані з кнопки
     _, _, meme_id_str, quantity_str, original_user_id_str = callback.data.split("_")
     meme_id = int(meme_id_str)
     quantity = int(quantity_str)
     original_user_id = int(original_user_id_str)
 
+    # Перевірка, чи натиснув власник
     if callback.from_user.id != original_user_id:
         return await callback.answer("🚫 Ця дія не для тебе.", show_alert=True)
 
     async with async_session() as session:
         user = await get_user(session, original_user_id)
         meme = await session.get(Meme, meme_id)
-        pf_item = (await session.execute(select(Portfolio).where(Portfolio.user_id==user.id, Portfolio.meme_id==meme.id))).scalar_one_or_none()
+        
+        # Шукаємо акції в портфелі
+        pf_item = (await session.execute(
+            select(Portfolio).where(Portfolio.user_id == user.id, Portfolio.meme_id == meme.id)
+        )).scalar_one_or_none()
 
-       # --- СТАЛО (Кращий варіант) ---
-    if not pf_item:
-     return await callback.answer("❌ Акцій вже немає.", show_alert=True)
+        if not pf_item:
+            return await callback.answer("❌ Акцій вже немає.", show_alert=True)
 
-# Якщо хоче продати 10, а є 9 - продаємо 9
-     amount_to_sell = min(quantity, pf_item.quantity)
+        # Якщо хоче продати 10, а є 9 - продаємо 9 (захист від помилок)
+        amount_to_sell = min(quantity, pf_item.quantity)
 
         # --- ЛОГІКА КОМІСІЇ ---
+        # Визначаємо % комісії залежно від наявності ліцензії
         current_commission_rate = Config.SELL_COMMISSION_BROKER if user.has_license else Config.SELL_COMMISSION_DEFAULT
         
-        gross_total = meme.current_price * quantity
+        gross_total = meme.current_price * amount_to_sell
         commission = gross_total * current_commission_rate
         net_income = gross_total - commission
         
+        # Нарахування балансу
         user.balance += net_income
-        pf_item.quantity -= quantity
-        if pf_item.quantity == 0: await session.delete(pf_item)
         
-        meme.trade_volume -= quantity 
+        # Списання акцій
+        pf_item.quantity -= amount_to_sell
+        if pf_item.quantity == 0:
+            await session.delete(pf_item)
+        
+        # Вплив на ринок (продаж знижує ціну, тому віднімаємо від volume)
+        meme.trade_volume -= amount_to_sell 
+        
         await session.commit()
         
         status_icon = "📜" if user.has_license else ""
         
         await callback.answer(
-            f"💵 Продано {quantity} {meme.ticker} {status_icon}\n"
+            f"💵 Продано {amount_to_sell} {meme.ticker} {status_icon}\n"
             f"Отримано: ${net_income:.2f}\n"
             f"Комісія: ${commission:.2f} ({current_commission_rate*100:.0f}%)",
             show_alert=True
         )
+        
+        # Оновлюємо вигляд (повертаємось до перегляду акції)
         new_callback = callback.model_copy(update={"data": f"view_{meme.id}"})
         await cb_view_meme(new_callback)
 
@@ -1407,6 +1420,7 @@ async def cmd_add_stock(message: types.Message):
         
     except Exception as e:
         await message.answer(f"❌ Помилка. Приклад:\n`/addstock PEP 15.5 0.05 https://url...`\nДеталі: {e}")
+
 
 
 
