@@ -154,7 +154,7 @@ async def main():
     scheduler = AsyncIOScheduler()
     scheduler.add_job(update_prices, "interval", seconds=60)
     scheduler.add_job(check_bets, "interval", seconds=10, args=[bot])
-    # scheduler.add_job(run_lottery, "interval", hours=24, args=[bot]) # Розкоментуй, коли додаси
+    scheduler.add_job(run_lottery, "interval", hours=24, args=[bot]) # Розкоментуй, коли додаси
     scheduler.start()
     
     await on_startup(bot)
@@ -167,3 +167,4 @@ if __name__ == "__main__":
     except (KeyboardInterrupt, SystemExit):
 
         logging.info("Bot stopped!")
+
