@@ -302,11 +302,19 @@ async def cb_prompt_buy(callback: types.CallbackQuery):
         if not user or not meme: 
             return await callback.answer("Сталася помилка.", show_alert=True)
 
-        # Визначаємо MAX, який може купити користувач
-        max_buy = int(user.balance // meme.current_price)
+       # Визначаємо MAX, який може купити користувач
+        # Захист від ділення на нуль
+        price = meme.current_price if meme.current_price > 0 else 0.01
+        
+        raw_max_buy = int(user.balance // price)
+        
+        # --- ВИПРАВЛЕННЯ ТУТ ---
+        # Обмежуємо максимальну покупку числом 1 мільярд, щоб не зламати базу даних (Integer Overflow)
+        SAFE_LIMIT = 1_000_000_000
+        max_buy = min(raw_max_buy, SAFE_LIMIT)
         
         if max_buy < 1:
-            return await callback.answer(f"❌ Недостатньо коштів для купівлі 1 {meme.ticker}. (Потрібно ${meme.current_price:.2f})", show_alert=True)
+            return await callback.answer(f"❌ Недостатньо коштів. (Ціна: ${meme.current_price:.2f})", show_alert=True)
 
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [
@@ -1420,6 +1428,7 @@ async def cmd_add_stock(message: types.Message):
         
     except Exception as e:
         await message.answer(f"❌ Помилка. Приклад:\n`/addstock PEP 15.5 0.05 https://url...`\nДеталі: {e}")
+
 
 
 
