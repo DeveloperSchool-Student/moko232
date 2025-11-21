@@ -1442,3 +1442,35 @@ async def cmd_profile(message: types.Message):
         except Exception:
 
             await message.answer(text, parse_mode="HTML")
+
+@router.message(Command("addstock"), IsAdmin())
+async def cmd_add_stock(message: types.Message):
+    # Формат: /addstock TICKER PRICE VOLATILITY IMAGE_URL
+    # Приклад: /addstock PEP 15.5 0.05 https://link.to/image.jpg
+    
+    try:
+        args = message.text.split()
+        ticker = args[1].upper()
+        price = float(args[2])
+        volatility = float(args[3])
+        image_url = args[4] if len(args) > 4 else None
+        
+        async with async_session() as session:
+            # Перевірка чи існує
+            exists = await session.execute(select(Meme).where(Meme.ticker == ticker))
+            if exists.scalar_one_or_none():
+                return await message.answer("❌ Така акція вже є.")
+            
+            new_meme = Meme(
+                ticker=ticker,
+                current_price=price,
+                volatility=volatility,
+                image_url=image_url
+            )
+            session.add(new_meme)
+            await session.commit()
+            
+        await message.answer(f"✅ Акцію **{ticker}** додано в гру!", parse_mode="Markdown")
+        
+    except Exception as e:
+        await message.answer(f"❌ Помилка. Приклад:\n`/addstock PEP 15.5 0.05 https://url...`\nДеталі: {e}")
