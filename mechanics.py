@@ -39,13 +39,12 @@ async def update_prices():
         memes = result.scalars().all()
 
         for meme in memes:
-            change_percent = 0.0
-            
             # 1. ВПЛИВ ГРАВЦІВ
             player_impact = meme.trade_volume * Config.MARKET_IMPACT_FACTOR
-            meme.trade_volume = 0
+            meme.trade_volume = 0 # Скидаємо об'єм
             
             # 2. АДМІНСЬКА МАНІПУЛЯЦІЯ
+            change_percent = 0.0
             if meme.manipulation_remaining > 0:
                 manipulation_effect = meme.volatility / 2 
                 if meme.manipulation_mode == 'UP':
@@ -55,20 +54,30 @@ async def update_prices():
                 meme.manipulation_remaining -= 1
                 if meme.manipulation_remaining == 0:
                     meme.manipulation_mode = "NONE"
-            
-            # 3. ПРИРОДНІ КОЛИВАННЯ
             else:
+                # 3. ПРИРОДНІ КОЛИВАННЯ
                 change_percent = random.uniform(-meme.volatility, meme.volatility)
             
+            # --- ВИПРАВЛЕННЯ ТУТ ---
             # 4. ПІДСУМКОВИЙ РОЗРАХУНОК
             total_change = change_percent + player_impact
+            
+            # Жорстке обмеження: ціна не може змінитися більше ніж на 30% (0.3) за хвилину
+            # Це рятує від краху до нуля
+            total_change = max(-0.3, min(0.3, total_change))
+            
             new_price = meme.current_price * (1 + total_change)
-            if new_price < 0.00000001: new_price = 0.00000001
+            
+            # Захист від занадто низької ціни (мінімум 1 цент або 0.01)
+            if new_price < 0.01: new_price = 0.01
+            
             meme.current_price = new_price
             
             # Запис історії цін
             history = PriceHistory(meme_id=meme.id, price=new_price)
             session.add(history)
+            
+            # ... (далі код новин залишається без змін) ...
 
             # --- 5. ГЕНЕРАЦІЯ НОВИН ---
             # Генеруємо новину, якщо ціна змінилась більше ніж на поріг
@@ -232,3 +241,4 @@ async def run_lottery(bot: Bot):
         # Очищаємо таблицю квитків
         await session.execute(delete(LotteryTicket))
         await session.commit()
+
